@@ -7,44 +7,41 @@ import linkRoutes from "./routes/links.js";
 dotenv.config();
 const app = express();
 
+/* -----------------
+   CORS FIRST
+------------------ */
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
 }));
 app.options("*", cors());
 
 app.use(express.json());
 
 /* -----------------
+   API ROUTES FIRST
+------------------ */
+app.use("/api/links", linkRoutes);
+
+/* -----------------
    Health check
 ------------------ */
 app.get("/healthz", (req, res) => {
-  res.json({
-    ok: true,
-    version: "1.0",
-    uptime: process.uptime()
-  });
+  res.json({ ok: true, version: "1.0", uptime: process.uptime() });
 });
 
 /* -----------------
-   Redirect handler
+   Redirect handler LAST
 ------------------ */
-app.get("/:code", async (req, res, next) => {
-  if (req.path.startsWith("/api") || req.path === "/" || req.path.startsWith("/code")) 
-    return next();
-
+app.get("/:code", async (req, res) => {
   const { code } = req.params;
 
-  const result = await pool.query(
-    "SELECT * FROM links WHERE code=$1",
-    [code]
-  );
+  const result = await pool.query("SELECT * FROM links WHERE code=$1", [code]);
 
   if (result.rowCount === 0)
     return res.status(404).send("Not found");
 
-  // increment
   await pool.query(
     `UPDATE links
      SET total_clicks = total_clicks + 1,
@@ -57,13 +54,10 @@ app.get("/:code", async (req, res, next) => {
 });
 
 /* -----------------
-   API Routes
------------------- */
-app.use("/api/links", linkRoutes);
-
-/* -----------------
    Start server
 ------------------ */
-app.listen(process.env.PORT, () =>
-  console.log(`Server running on port ${process.env.PORT}`)
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () =>
+  console.log(`Server running on port ${PORT}`)
 );
